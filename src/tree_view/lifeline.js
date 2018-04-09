@@ -1,11 +1,10 @@
 import * as d3 from 'd3'
 import {ensure_single} from '../utils/events';
-import './lifeline.css';
+import './lifeline.scss';
 import {noop} from "../model/filter";
-// import * as chromatic from "d3-scale-chromatic";
 
 export default function Lifeline() {
-  let margin = {top: 10, right: 10, bottom: 50, left:60},
+  let margin = {top: 10, right: 30, bottom: 50, left:60},
     width = 800 - margin.left - margin.right,
     height = 500 - margin.top - margin.bottom;
 
@@ -24,7 +23,6 @@ export default function Lifeline() {
   let y_axis = d3.axisLeft(sy).ticks(4, '.1e');
   let x_axis = d3.axisBottom(pt_scale).ticks(8, 's');
 
-  // let cmapBWR = d3.interpolateRgbBasis(["#4472a5", "#f2f2f2", "#d73c4a"]);
   let cmapGWP = d3.interpolateRgbBasis(["#3e926e", "#f2f2f2", "#9271e2"]);
 
   let color = d3.scaleSequential(cmapGWP /* chromatic['interpolateRdYlBu']*/ ).domain([1,0.8]);
@@ -53,7 +51,7 @@ export default function Lifeline() {
     if (root && root.model)
       visit(root);
 
-    let d3nodes = svg.select('.nodes').selectAll('.node');
+    let d3nodes = svg.select('.nodes').selectAll('.node').filter( n => !n.highlight);
 
     if (color_by ==='minmax') {
       d3nodes
@@ -115,16 +113,19 @@ export default function Lifeline() {
   }
 
   function render(items = null) {
-    if (!svg) return;
+    if (!svg || !feature) return;
 
     items = items || nodes;
     svg.select('.x').call(x_axis);
     svg.select('.y').call(y_axis);
 
+    let c= feature.colorScale;
+    let [dmin, dmax] = c.domain();
+    let dmid = (dmin+dmax)/2;
 
     let gradients = svg.select('defs').selectAll('linearGradient')
       .data(color_by === 'minmax' ? items : [],
-          d => `g-${d.id}`);
+          d => d.id);
 
     let defs = gradients.enter()
       .append('linearGradient')
@@ -133,21 +134,48 @@ export default function Lifeline() {
       .attr('x2', '0%').attr('y2', '100%');
 
     defs.append('stop')
+
       .attr('offset', '0%')
-      .attr('stop-color', d => color(d.minmax[d.parent && d.parent.merge === 'min' ? 0 : 1]))
+      .attr('stop-color', d => c(d.minmax[d.parent && d.parent.merge === 'min' ? 0 : 1]))
+      .attr('opacity', 1);
+
+    defs.append('stop')
+      .attr('offset', d => `${d.mid_percent}%`)
+      .attr('stop-color', d => c(d.mid_value))
       .attr('opacity', 1);
 
     defs.append('stop')
       .attr('offset', '100%')
-      .attr('stop-color', d => color(d.minmax[d.parent && d.parent.merge === 'min' ? 1 : 0]))
+      .attr('stop-color', d => c(d.minmax[d.parent && d.parent.merge === 'min' ? 1 : 0]))
       .attr('opacity', 1);
+
+    let update = defs.merge(gradients)
+      .each( d => {
+        let [pmin, pmax] = d.minmax;
+        if (pmin <= dmid && dmid <= pmax) {
+          d.mid_percent = Math.round(100 * (dmid - pmin) / (pmax - pmin));
+          d.mid_value = dmid;
+        }
+        else {
+          d.mid_percent = 0;
+          d.mid_value = pmin;
+        }
+      });
+
+    update.select(':first-child')
+      .attr('stop-color', d => c(d.minmax[d.parent && d.parent.merge === 'min' ? 0 : 1]));
+    update.select(":nth-child(2)")
+      .attr('offset', d => `${d.mid_percent}%`)
+      .attr('stop-color', d => c(d.mid_value));
+    update.select(':nth-child(3')
+      .attr('stop-color', d => c(d.minmax[d.parent && d.parent.merge === 'min' ? 1 : 0]));
 
     gradients.exit().remove();
 
     let d3nodes = svg.select('.nodes').selectAll('.node')
       .data(items, d => d.id);
 
-    let enter = d3nodes.enter()
+    d3nodes.enter()
       .append('rect')
         .attr('class', 'node')
         .on('mouseenter', d => hover(d, true))
@@ -159,7 +187,7 @@ export default function Lifeline() {
         .attr('y', d => sy(d.pos.yp))
         .attr('width', d => {
           // console.log(d.id, d.pos.x, d.pos.w, sx(d.pos.x + d.pos.w), sx(d.pos.x));
-          return Math.max(0, sx(d.pos.x + d.pos.w) - sx(d.pos.x)-1)
+          return Math.max(1, sx(d.pos.x + d.pos.w) - sx(d.pos.x)-1)
         })
         .attr('height', d => Math.max(0, sy(d.pos.y) - sy(d.pos.yp)-1))
         .classed('highlight', d => d.highlight)
@@ -196,70 +224,84 @@ export default function Lifeline() {
   }
 
   function lifeline(selection) {
-    svg = selection
-      .append('svg')
-        .attr('class', 'lifeline')
-        .attr('width', width + margin.left + margin.right)
-        .attr('height', height + margin.top + margin.bottom)
-      .append('g')
+    width = parseInt(selection.style('width'))-margin.left - margin.right;
+    height = parseInt(selection.style('height')) - margin.top - margin.bottom;
+
+    console.log('lifeline', width, height);
+    if (isNaN(width) || isNaN(height)) return;
+
+    let g = selection.selectAll('g')
+      .data([1])
+      .enter()
+        .append('g')
         .attr('transform', `translate(${margin.left},${margin.top})`);
-    svg.append('g')
+
+    g.append('g')
       .attr('class', 'nodes');
 
-    svg.append('g')
+    g.append('g')
       .attr('class', 'names');
 
-    svg.append('g')
+    g.append('g')
       .attr('class', 'x axis')
-      .attr('transform', `translate(0,${height})`)
       .append('text')
         .attr('class', 'axis-label')
-        .attr('transform', `translate(${width/2},${margin.top + 20})`)
         .style('text-anchor', 'middle')
         .text('Points');
 
-    svg.append('g')
+    g.append('g')
       .attr('class', 'y axis')
       .append('text')
         .attr('class', 'axis-label')
         .attr('transform', 'rotate(-90)')
-        .attr('y', 0 - margin.left)
-        .attr('x',0 - (height / 2))
+
         .attr('dy', '1em')
         .style('text-anchor', 'middle')
         .text('Persistence');
 
-    let defs = svg.append('defs');
+    g.append('defs');
 
-    let filter = defs.append('filter')
-      .attr('id', 'drop-shadow')
-      .attr('height', '130%')
-      .attr('width', '130%');
+    svg = selection.merge(g);
 
-    filter.append("feGaussianBlur")
-      .attr("in", "SourceAlpha")
-      .attr("stdDeviation", 5)
-      .attr("result", "blur");
+    svg.select('.x')
+      .attr('transform', `translate(0,${height})`)
+      .select('text')
+      .attr('transform', `translate(${width/2},${margin.top + 20})`);
 
-    filter.append("feOffset")
-      .attr("in", "blur")
-      .attr("dx", 5)
-      .attr("dy", 5)
-      .attr("result", "shadow");
+    svg.select('.y text')
+      .attr('y', 0 - margin.left)
+      .attr('x',0 - (height / 2));
 
-    let feMerge = filter.append("feMerge");
+    pt_scale.range([0, width]);
+    sx.range([0, width]);
+    sy.range([height, 0]);
 
-    feMerge.append("feMergeNode")
-      .attr("in", "shadow");
-    feMerge.append("feMergeNode")
-      .attr("in", "SourceGraphic");
+    // let defs = svg.append('defs');
+    //
+    // let filter = defs.append('filter')
+    //   .attr('id', 'drop-shadow')
+    //   .attr('height', '130%')
+    //   .attr('width', '130%');
+    //
+    // filter.append("feGaussianBlur")
+    //   .attr("in", "SourceAlpha")
+    //   .attr("stdDeviation", 5)
+    //   .attr("result", "blur");
+    //
+    // filter.append("feOffset")
+    //   .attr("in", "blur")
+    //   .attr("dx", 5)
+    //   .attr("dy", 5)
+    //   .attr("result", "shadow");
+    //
+    // let feMerge = filter.append("feMerge");
+    //
+    // feMerge.append("feMergeNode")
+    //   .attr("in", "shadow");
+    // feMerge.append("feMergeNode")
+    //   .attr("in", "SourceGraphic");
 
-    // let gradient = defs.append('linearGradient')
-    //   .attr('id', 'minmax');
-    // gradient.append('stop')
-    //   .attr('class', 'stop-bottom').style('offset', '0');
-    // gradient.append('stop')
-    //   .attr('class', 'stop-top').style('offset', '1');
+    render();
 
     return lifeline;
   }
@@ -276,9 +318,39 @@ export default function Lifeline() {
     return this;
   };
 
-  lifeline.highlight = function(node, on) {
-    node.highlight = on;
-    svg.selectAll('.node').data([node], d => d.id).classed('highlight', on);
+  lifeline.highlight = function(items, on) {
+    items = Array.isArray(items) && items || [items];
+    items.forEach(n => n.highlight = on);
+    svg.selectAll('.node').data(items, d => d.id)
+      .each( function(d) {
+        if (on) {
+          d._fill = d3.select(this).style('fill');
+          d3.select(this).style('fill', null);
+        }
+        else
+          d3.select(this).style('fill', d._fill);
+      })
+      .classed('highlight', on);
+
+    if (on) render_names();
+    return this;
+  };
+
+  lifeline.highlight_list = function(list, on) {
+    list.partitions.forEach( p => p.highlight_type = on && list.type || null);
+
+    svg.selectAll('.node').data(list.partitions, d => d.id)
+      .each( function(d) {
+        if (on) {
+          d._fill = d3.select(this).style('fill');
+          d3.select(this).style('fill', null);
+        }
+        else
+          d3.select(this).style('fill', d._fill);
+      })
+      .classed('highlight_max', d => on && d.highlight_type === 'max')
+      .classed('highlight_min', d => on && d.highlight_type === 'min');
+
     if (on) render_names();
     return this;
   };
@@ -358,7 +430,8 @@ export default function Lifeline() {
     return this;
   };
 
-  lifeline.color_by = function(feature) {
+  lifeline.color_by = function(_) {
+    feature = _;
     color_by = feature.name;
     color = feature.color;
     render();

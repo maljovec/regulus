@@ -11,8 +11,6 @@ export default class Partition {
 
     this.minmax_idx = data.minmax_idx;
     this.minmax = [msc.pts[data.minmax_idx[0]][msc.name], msc.pts[data.minmax_idx[1]][msc.name]];
-    if (this.minmax[0] > this.minmax[1])
-       console.log('partition:', this.id, ' minmax:', this.minmax);
     this.pts_idx = data.span;
     this._pts = data.pts;
     this.model = data.model;
@@ -60,8 +58,8 @@ export default class Partition {
       for (let i = this.pts_idx[0]; i < to; i++) {
         pts.push(msc_pts[msc_idx[i]]);
       }
-      pts.push(msc_pts[this.minmax_idx[0]]);
-      pts.push(msc_pts[this.minmax_idx[1]]);
+      // pts.push(msc_pts[this.minmax_idx[0]]);
+      // pts.push(msc_pts[this.minmax_idx[1]]);
 
       this._pts = pts;
       let t1 = performance.now();

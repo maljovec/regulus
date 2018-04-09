@@ -361,7 +361,6 @@ def create_from_csv(filename, name, ndims):
         header = next(reader)
         data = [[float(x) for x in row] for row in reader]
         # data = [p for p in data if p[-1] > 700]
-        data = [p for p in data]
         # print('new len', len(data))
 
         if ndims is None:
@@ -386,6 +385,7 @@ def load_regulus(filename):
 
 
 def save_regulus(filename, regulus):
+    #print("Post_filename", filename)
     with open(filename, 'w') as f:
         json.dump(regulus, f, indent=2)
 
@@ -400,14 +400,14 @@ def post(args=None):
     p.add_argument('-G', '--graph', default='relaxed beta skeleton', help='graph')
 
     p.add_argument('--p', action='store_true', help='use parameters in json')
-
-    p.add_argument('--multiple', action='store_true', help='save to multiple jsons')
+    p.add_argument('-o', '--out', help='use parameters in json')
 
     p.add_argument('-d', '--dims', type=int, default=None, help='number of input dimensions')
     p.add_argument('-m', '--measure', default=None, help='measure name')
     p.add_argument('-c', '--col', type=int, default=None, help='measure column index starting at 0')
 
     p.add_argument('--name', default=None, help='dataset name')
+    p.add_argument('--morse', default='smale', choices=['smale', 'ascend', 'descend'], help='type of complex to compute')
 
     p.add_argument('--debug', action='store_true', help='process all measures')
 
@@ -421,7 +421,8 @@ def post(args=None):
     measures = []
 
     if filename.suffix == '.csv':
-        regulus = create_from_csv(filename, ns.name or path.name or filename.stem, ns.dims)
+        print(filename.stem)
+        regulus = create_from_csv(filename, ns.name or filename.stem or path.name, ns.dims)
     elif filename.suffix == '.json':
         regulus = load_regulus(filename)
     else:
@@ -448,6 +449,7 @@ def post(args=None):
     np_data = np.concatenate((x, y), axis=1)
     data = np_data.tolist()
     regulus['pts'] = data
+
     if ns.p:
         param_in_file = regulus['mscs'][0]["params"]
         if type(param_in_file) is dict:
@@ -462,22 +464,7 @@ def post(args=None):
             if "g" in param_in_file:
                 ns.gradient = param_in_file["g"]
 
-    if ns.multiple:
-        catalog_path = path / 'catalog.json'
-        if catalog_path.exists():
-            with open(catalog_path) as f:
-                catalog = json.load(f)
-    else:
-        catalog = {
-            'name': filename.parent,
-            'data': filename.name,
-            'dims': ndims,
-            'msc': []
-        }
-    if ns.name is not None:
-        catalog['name'] = ns.name
 
-    available = set(catalog['msc'])
     mscs = dict()
     for msc in regulus['mscs']:
         mscs[msc['name']] = msc
@@ -496,42 +483,43 @@ def post(args=None):
             y = np_data[:, ndims+i]
             msc = MSC(ns.graph, ns.gradient, ns.knn, ns.beta, ns.norm, debug=True, aggregator='mean')  # connect=True
             msc.build(X=x, Y=y, names=regulus['dims']+[measure])
-            print('msc done')
 
             x = msc.X
             y = msc.Y
 
-
-            # if ns.debug:
-            #     msc.save(path/ (measure + '_hierarchy.csv'), path / (measure + '_partition.json'))
-
-            if ns.multiple:
-                Post(ns.debug)\
-                    .data(y)\
-                    .msc(msc.base_partitions, msc.hierarchy)\
-                    .build()\
-                    .verify()\
-                    .save(path, measure, params)
-            else:
-                tree = Post(ns.debug) \
+            if ns.morse == 'descend':
+                tmp = Post(ns.debug) \
                     .data(y) \
-                    .msc(msc.base_partitions, msc.hierarchy) \
-                    .build() \
-                    .verify() \
-                    .get_tree(measure, params)
-                mscs[measure] = tree
-            available.add(measure)
+                    .msc(msc.descending_partitions, msc.max_hierarchy)
+            elif ns.morse == 'ascend':
+                tmp = Post(ns.debug) \
+                    .data(y) \
+                    .msc(msc.ascending_partitions, msc.min_hierarchy)
+            else:
+                tmp = Post(ns.debug) \
+                    .data(y) \
+                    .msc(msc.base_partitions, msc.hierarchy)
+
+            mscs[measure] = tmp \
+                .build() \
+                .verify() \
+                .get_tree(measure, params)
+
         except RuntimeError as error:
             print(error)
 
-    catalog['msc'] = sorted(list(available))
-
-    if not ns.multiple:
-        regulus['mscs'] = list(mscs.values())
-        save_regulus(filename.with_suffix('.json'), regulus)
+    regulus['mscs'] = list(mscs.values())
+    #print("filename",filename)
+    if ns.out:
+        out = ns.out
+    elif ns.morse == 'ascend':
+        out = filename.with_name(filename.stem+'_ascend')
+    elif ns.morse == 'descend':
+        out = filename.with_name(filename.stem + '_descend')
     else:
-        with open(path / 'catalog.json', 'w') as f:
-            json.dump(catalog, f, indent=2)
+        out = filename
+    #print(out)
+    save_regulus(out.with_suffix('.json'), regulus)
 
 
 if __name__ == '__main__':

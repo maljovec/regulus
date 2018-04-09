@@ -1,0 +1,26 @@
+.tree_view {
+  //display: flex;
+  //flex-direction: column;
+
+  .config {
+    padding: 5px;
+    display: flex;
+    flex-direction: row;
+  }
+
+  .tree {
+    //flex: 1 1 auto;
+    padding: 10px;
+  }
+
+  .y-axis, .x-axis {
+    display: flex;
+    align-items: center;
+    margin-right: 30px;
+  }
+
+  .y-axis select, .x-axis select {
+    margin-left: 10px;
+  }
+}
+

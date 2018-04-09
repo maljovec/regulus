@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import './slider.scss';
 
 export default function Slider() {
   let margin = {top: 15, right: 10, bottom: 0, left: 10};
@@ -47,7 +48,6 @@ export default function Slider() {
         .attr('class', 'label')
         .attr('transform', `translate(${width / 2},${height + margin.top + 20})`)
         .style('text-anchor', 'middle');
-      //   .text('Persistence');
 
       let scale = d.type === 'log' ? d3.scaleLog() : d3.scaleLinear();
       scale.domain(d.domain).range([0, width]).clamp(true).nice();
@@ -59,9 +59,17 @@ export default function Slider() {
         .call(d3.axisBottom(scale).ticks(d.ticks.n, d.ticks.format));
 
       all.select('.brush')
-        .call(brush)
-        // .call(brush.move, d.selection.map(scale))
-      ;
+        .call(brush);
+
+      try {
+        if (d.selection) {
+          all.select('.brush')
+            .call(brush.move, d.selection.map(scale))
+          ;
+        }
+      } catch(e) {
+        // console.log(e);
+      }
     });
   }
 

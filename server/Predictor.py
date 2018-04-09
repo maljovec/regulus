@@ -156,6 +156,7 @@ class Predictor(object):
             print('Done')
             msg = "%s: %f +/- %f" % (name, cv_results.mean(), cv_results.std())
             print(msg)
+
             if cv_results.mean() > best_cv_score:
                 best_cv_score = cv_results.mean()
                 best_model = bestimator

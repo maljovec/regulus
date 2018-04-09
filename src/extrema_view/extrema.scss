@@ -1,0 +1,84 @@
+@import "../app/variables";
+
+.extrema_view {
+  overflow: auto;
+  padding: 5px;
+
+  .ev_header_label {
+    display: inline-block;
+    padding: 5px;
+    font-size: 0.875rem;
+  }
+
+  .ev_header_value {
+    display: inline-block;
+    padding: 10px;
+  }
+
+  .grid {
+    display: grid;
+    //grid-template-columns: 1fr 1fr 1fr;
+    grid-auto-columns: min-content;
+    //grid-gap: 5px;
+    grid-auto-rows: auto;
+    margin-left: 1px;
+
+    .header_id {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .header_value {
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    .header_n {
+      grid-column: 4;
+      grid-row: 1;
+    }
+
+    .ev_color {
+      grid-column: 1;
+      width: 10px;
+      margin: 2px;
+    }
+
+    .ev_id {
+      grid-column: 2;
+      text-align: right;
+      margin: 0 2px;
+
+      &:hover {
+        background-color: lightgray;
+      }
+    }
+
+    .ev_value {
+      grid-column: 3;
+      text-align: right;
+      margin: 0 2px;
+    }
+
+    .ev_n {
+      grid-column: 4;
+      text-align: right;
+      margin: 0 2px;
+    }
+
+    .ev_min {
+      background-color: $min_color;
+    }
+
+    .ev_max {
+      background-color: $max_color;
+    }
+  }
+
+  .header {
+    font-size: 0.75rem;
+    font-weight: bold;
+    display: block;
+    border-bottom: 1px solid gray;
+  }
+}

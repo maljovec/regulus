@@ -1,0 +1,34 @@
+
+
+.charts_view {
+  padding: 5px;
+  overflow: auto;
+
+  .chart {
+    /*background-color: lightcyan;*/
+
+    path {
+      fill: none;
+      stroke: steelblue;
+      stroke-width: 1px;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+    }
+
+    .axis {
+      fill: black;
+    }
+
+    .brush .selection {
+      fill: lightgray;
+    }
+
+  }
+}
